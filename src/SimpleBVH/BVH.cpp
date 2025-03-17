@@ -104,6 +104,7 @@ void BVH::init(const std::vector<std::array<Eigen::Vector3d, 2>>& cornerlist)
     n_corners = cornerlist.size();
 
     Eigen::MatrixXd box_centers(n_corners, 3);
+#pragma omp parallel for
     for (int i = 0; i < n_corners; ++i) {
         box_centers.row(i) = (cornerlist[i][0] + cornerlist[i][1]) / 2;
     }
@@ -111,6 +112,7 @@ void BVH::init(const std::vector<std::array<Eigen::Vector3d, 2>>& cornerlist)
     const Eigen::RowVector3d vmin = box_centers.colwise().minCoeff();
     const Eigen::RowVector3d vmax = box_centers.colwise().maxCoeff();
     const Eigen::RowVector3d center = (vmin + vmax) / 2;
+#pragma omp parallel for
     for (int i = 0; i < n_corners; i++) {
         // make box centered at origin
         box_centers.row(i) -= center;
@@ -132,6 +134,7 @@ void BVH::init(const std::vector<std::array<Eigen::Vector3d, 2>>& cornerlist)
     const int multi = 1000;
     list.resize(n_corners);
 
+#pragma omp parallel for
     for (int i = 0; i < n_corners; i++) {
         const Eigen::MatrixXd tmp = box_centers.row(i) * multi;
 
@@ -143,15 +146,19 @@ void BVH::init(const std::vector<std::array<Eigen::Vector3d, 2>>& cornerlist)
     const auto morton_compare = [](const sortstruct& a, const sortstruct& b) {
         return (a.morton < b.morton);
     };
+
     std::sort(list.begin(), list.end(), morton_compare);
 
-    new2old.resize(n_corners);
+    if (new2old.size() < n_corners)
+        new2old.resize(n_corners);
+#pragma omp parallel for
     for (int i = 0; i < n_corners; i++) {
         new2old[i] = list[i].order;
     }
 
     std::vector<std::array<Eigen::Vector3d, 2>> sorted_cornerlist(n_corners);
 
+#pragma omp parallel for
     for (int i = 0; i < n_corners; i++) {
         sorted_cornerlist[i] = cornerlist[list[i].order];
     }
